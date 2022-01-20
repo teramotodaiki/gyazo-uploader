@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+import PhotosUI
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -16,33 +17,52 @@ struct ContentView: View {
         animation: .default)
     private var items: FetchedResults<Item>
 
-    
+    @State var images: [UIImage] = []
     
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                    } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
-                    }
+        let columns: [GridItem] = [
+            GridItem(.adaptive(minimum: 100, maximum: .infinity))
+        ]
+        ScrollView {
+            LazyVGrid(columns: columns) {
+                ForEach((0..<images.count), id: \.self) { index in
+                    Image(uiImage: images[index])
+                        .resizable(resizingMode: .stretch)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 128, height: 128)
+                 }
+            }.font(.largeTitle)
+        }.onAppear(perform: viewDidLoad)
+    }
+    
+    
+    private func viewDidLoad() {
+        // Request permission to access photo library
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { [self] (status) in
+            DispatchQueue.main.async { [self] in
+                if(status == .authorized) {
+                    showUI()
                 }
-                .onDelete(perform: deleteItems)
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-            Text("Select an item")
         }
     }
+    
+    private func showUI() {
+        let result = PHAsset.fetchAssets(with: nil)
+        let manager = PHImageManager.default()
+        let options = PHImageRequestOptions()
+        
+        options.deliveryMode = .highQualityFormat
+        let assets = result.objects(at: IndexSet(integersIn: 0...10))
+        for asset in assets {
+            manager.requestImage(for: asset, targetSize: CGSize(width: 128, height: 128), contentMode: .aspectFit, options: options, resultHandler: { (image, _) in
+                if (image == nil) { return }
+                images.append(image!)
+            })
+        }
+        
+    }
+    
 
     private func addItem() {
         withAnimation {
@@ -86,7 +106,8 @@ private let itemFormatter: DateFormatter = {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+            let sampleImages = Array(repeating: UIImage(imageLiteralResourceName: "tani"), count: 20)
+            ContentView(images: sampleImages ).environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
         }
     }
 }
