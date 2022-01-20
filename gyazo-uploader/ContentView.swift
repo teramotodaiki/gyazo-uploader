@@ -26,10 +26,14 @@ struct ContentView: View {
         ScrollView {
             LazyVGrid(columns: columns) {
                 ForEach((0..<images.count), id: \.self) { index in
-                    Image(uiImage: images[index])
+                    let image = images[index]
+                    Image(uiImage: image)
                         .resizable(resizingMode: .stretch)
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 128, height: 128)
+                        .onTapGesture{
+                            uploadImage(image: image)
+                        }
                  }
             }.font(.largeTitle)
         }.onAppear(perform: viewDidLoad)
@@ -47,20 +51,36 @@ struct ContentView: View {
         }
     }
     
+    private func uploadImage(image: UIImage) {
+        var request = URLRequest(url: URL(string: "http://localhost:3000")!)
+        request.httpMethod = "GET"
+        let session = URLSession.shared
+        let task = session.dataTask(with: request, completionHandler: { data, response, error -> Void in
+//            print(response!)
+            do {
+                let json = try JSONSerialization.jsonObject(with: data!) as! Dictionary<String, AnyObject>
+                print(json)
+            } catch {
+                print("error")
+            }
+        })
+        task.resume()
+        
+        print("clicked")
+    }
+    
     private func showUI() {
         let result = PHAsset.fetchAssets(with: nil)
         let manager = PHImageManager.default()
         let options = PHImageRequestOptions()
         
         options.deliveryMode = .highQualityFormat
-        let assets = result.objects(at: IndexSet(integersIn: 0...10))
-        for asset in assets {
+        result.enumerateObjects({ (asset, _, _) in
             manager.requestImage(for: asset, targetSize: CGSize(width: 128, height: 128), contentMode: .aspectFit, options: options, resultHandler: { (image, _) in
                 if (image == nil) { return }
                 images.append(image!)
             })
-        }
-        
+        })
     }
     
 
