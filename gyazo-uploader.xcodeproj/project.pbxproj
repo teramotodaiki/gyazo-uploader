@@ -36,6 +36,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		190F9EC3279A2129001DF71C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		19F92AB2279718BC00F28DEB /* gyazo-uploader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "gyazo-uploader.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		19F92AB5279718BC00F28DEB /* gyazo_uploaderApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = gyazo_uploaderApp.swift; sourceTree = "<group>"; };
 		19F92AB7279718BC00F28DEB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -98,6 +99,7 @@
 		19F92AB4279718BC00F28DEB /* gyazo-uploader */ = {
 			isa = PBXGroup;
 			children = (
+				190F9EC3279A2129001DF71C /* Info.plist */,
 				19F92AB5279718BC00F28DEB /* gyazo_uploaderApp.swift */,
 				19F92AB7279718BC00F28DEB /* ContentView.swift */,
 				19F92AB9279718BE00F28DEB /* Assets.xcassets */,
@@ -430,6 +432,7 @@
 				DEVELOPMENT_TEAM = 87NQ692XT2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "gyazo-uploader/Info.plist";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Your photos will upload to Gyazo.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -461,6 +464,7 @@
 				DEVELOPMENT_TEAM = 87NQ692XT2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "gyazo-uploader/Info.plist";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Your photos will upload to Gyazo.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
