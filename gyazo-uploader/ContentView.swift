@@ -9,6 +9,11 @@ import SwiftUI
 import CoreData
 import PhotosUI
 
+struct LocalImageAsset {
+    var localIdentifier: String
+    var image: UIImage
+}
+
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -17,7 +22,7 @@ struct ContentView: View {
         animation: .default)
     private var items: FetchedResults<Item>
 
-    @State var images: [UIImage] = []
+    @State var imageAssets: [LocalImageAsset] = []
     
     var body: some View {
         let columns: [GridItem] = [
@@ -25,14 +30,14 @@ struct ContentView: View {
         ]
         ScrollView {
             LazyVGrid(columns: columns) {
-                ForEach((0..<images.count), id: \.self) { index in
-                    let image = images[index]
-                    Image(uiImage: image)
+                ForEach((0..<imageAssets.count), id: \.self) { index in
+                    let imageAsset = imageAssets[index]
+                    Image(uiImage: imageAsset.image)
                         .resizable(resizingMode: .stretch)
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 128, height: 128)
                         .onTapGesture{
-                            uploadImage(image: image)
+                            uploadImage(image: imageAsset.image)
                         }
                  }
             }.font(.largeTitle)
@@ -85,9 +90,10 @@ struct ContentView: View {
             if (error != nil) {
                 return
             }
-            print("response: \(String(data: data!, encoding: .utf8)!)")
+//            print("response: \(String(data: data!, encoding: .utf8)!)")
             do {
                 let json = try JSONSerialization.jsonObject(with: data!, options: .fragmentsAllowed)
+                print(json)
             } catch {
                 print("Parse failed.")
             }
@@ -105,7 +111,8 @@ struct ContentView: View {
         result.enumerateObjects({ (asset, _, _) in
             manager.requestImage(for: asset, targetSize: CGSize(width: 128, height: 128), contentMode: .aspectFit, options: options, resultHandler: { (image, _) in
                 if (image == nil) { return }
-                images.append(image!)
+                let imageAsset = LocalImageAsset(localIdentifier: asset.localIdentifier, image: image!)
+                imageAssets.append(imageAsset)
             })
         })
     }
@@ -163,8 +170,10 @@ private func getAccessToken() -> String {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            let sampleImages = Array(repeating: UIImage(imageLiteralResourceName: "tani"), count: 20)
-            ContentView(images: sampleImages ).environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+            let sampleAssets = Array(repeating: LocalImageAsset(
+                localIdentifier: UUID().uuidString, image:
+                UIImage(imageLiteralResourceName: "tani")), count: 20)
+            ContentView(imageAssets: sampleAssets ).environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
         }
     }
 }
