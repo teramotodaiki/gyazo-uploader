@@ -102,14 +102,18 @@ struct ContentView: View {
         
     }
     
+    // will call after PHPhotoLibrary.requestAuthorization
     private func showUI() {
         let result = PHAsset.fetchAssets(with: nil)
         let manager = PHImageManager.default()
         let options = PHImageRequestOptions()
         
+        options.version = .current
         options.deliveryMode = .highQualityFormat
+        options.resizeMode = .none
         result.enumerateObjects({ (asset, _, _) in
-            manager.requestImage(for: asset, targetSize: CGSize(width: 128, height: 128), contentMode: .aspectFit, options: options, resultHandler: { (image, _) in
+            // fetch original image binary
+            manager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options, resultHandler: { (image, _) in
                 if (image == nil) { return }
                 let imageAsset = LocalImageAsset(localIdentifier: asset.localIdentifier, image: image!)
                 imageAssets.append(imageAsset)
