@@ -46,6 +46,7 @@ struct ContentView: View {
     }
     @State var assets: [PHAsset] = []
     @State var uploadPhotoNum = 0
+    @State var uploadingImage: UIImage? = nil
     
     var body: some View {
         VStack {
@@ -58,6 +59,12 @@ struct ContentView: View {
                         appPhase = .complete
                     }
                 }
+            }
+            if uploadingImage != nil {
+                Image(uiImage: uploadingImage!)
+                    .resizable(resizingMode: .stretch)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 128)
             }
         }.onAppear(perform: viewDidLoad)
     }
@@ -94,6 +101,7 @@ struct ContentView: View {
         for asset in assets {
             // asset.localIdentifier
             let image = await requestImageAsync(asset: asset) // get photo from storage or icloud
+            uploadingImage = image // show uploading image
             do {
                 _ = try await uploadImage(image: image)
                 uploadPhotoNum += 1
@@ -172,7 +180,9 @@ struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
             let dummyAssets: [PHAsset] = Array(repeating: PHAsset(), count: 20)
-            ContentView(appPhase: .uploadReady, assets: dummyAssets).environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+            let dummyImage = UIImage(imageLiteralResourceName: "tani")
+            ContentView(appPhase: .uploading, assets: dummyAssets, uploadingImage: dummyImage)
+                .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
         }
     }
 }
