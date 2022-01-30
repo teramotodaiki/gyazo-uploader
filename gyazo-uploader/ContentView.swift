@@ -14,44 +14,114 @@ struct LocalImageAsset {
     var image: UIImage
 }
 
+enum AppPhase {
+    case initialized // request authorization for photo library
+    case denied // access denied
+    case uploadReady // fetched assets from photo library
+    case uploading // uploading images to gyazo
+    case complete // upload completed
+}
+
+enum AppError: Error {
+    case invalidPhotoData
+}
+
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
-    @State var imageAssets: [LocalImageAsset] = []
+    @State var appPhase: AppPhase = .initialized
+    var statusMessage: String {
+        switch appPhase {
+        case .initialized:
+            return "Requesting to access your photos..."
+        case .denied:
+            return "Please allow to access your photos"
+        case .uploadReady:
+            return "\(assets.count) photos will upload"
+        case .uploading:
+            return "\(uploadPhotoNum)/\(assets.count) photos uploaded"
+        case .complete:
+            return "Completed! \(uploadPhotoNum)/\(assets.count) photos uploaded!"
+        }
+    }
+    @State var assets: [PHAsset] = []
+    @State var uploadPhotoNum = 0
     
     var body: some View {
-        let columns: [GridItem] = [
-            GridItem(.adaptive(minimum: 100, maximum: .infinity))
-        ]
-        ScrollView {
-            LazyVGrid(columns: columns) {
-                ForEach((0..<imageAssets.count), id: \.self) { index in
-                    let imageAsset = imageAssets[index]
-                    Image(uiImage: imageAsset.image)
-                        .resizable(resizingMode: .stretch)
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 128, height: 128)
-                        .onTapGesture{
-                            uploadImage(image: imageAsset.image)
-                        }
-                 }
-            }.font(.largeTitle)
+        VStack {
+            Text(statusMessage).padding()
+            if (appPhase == .uploadReady) {
+                Button("Upload!") {
+                    appPhase = .uploading
+                    Task {
+                        await uploadAllPhotos()
+                        appPhase = .complete
+                    }
+                }
+            }
         }.onAppear(perform: viewDidLoad)
     }
     
     
     private func viewDidLoad() {
+        if (appPhase != .initialized) {return} // for Preview
+
         // Request permission to access photo library
         PHPhotoLibrary.requestAuthorization(for: .readWrite) { [self] (status) in
             DispatchQueue.main.async { [self] in
                 if(status == .authorized) {
-                    showUI()
+                    onAuthorized()
+                    appPhase = .uploadReady
+                } else {
+                    appPhase = .denied
                 }
             }
         }
     }
     
-    private func uploadImage(image: UIImage) {
+    // will call after PHPhotoLibrary.requestAuthorization
+    private func onAuthorized() {
+        let result = PHAsset.fetchAssets(with: .image, options: nil)
+        
+        let jikkenLimit = 10 // no spam in experiment
+        let count = min(jikkenLimit, result.count)
+        
+        assets = result.objects(at: IndexSet(0..<count))
+    }
+    
+    private func uploadAllPhotos() async {
+        uploadPhotoNum = 0
+        for asset in assets {
+            // asset.localIdentifier
+            let image = await requestImageAsync(asset: asset) // get photo from storage or icloud
+            do {
+                _ = try await uploadImage(image: image)
+                uploadPhotoNum += 1
+            } catch {
+                print(error)
+                print("Unknown error was occured")
+            }
+        }
+    }
+    
+    private func requestImageAsync(asset: PHAsset) async -> UIImage {
+        let manager = PHImageManager.default()
+        let options = PHImageRequestOptions()
+        options.version = .current
+        options.deliveryMode = .highQualityFormat
+        options.resizeMode = .none
+        
+        return await withCheckedContinuation({
+            (continuation: CheckedContinuation<UIImage, Never>) in
+                // which is better requestImage or requestImageDataAndOrientation?
+                manager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options, resultHandler: { (image, _) in
+                        // TODO: support image is nil
+                        continuation.resume(returning: image!)
+            })
+        })
+    }
+    
+    private func uploadImage(image: UIImage) async throws -> String {
         let url = "https://upload.gyazo.com/api/upload"
         var request = URLRequest(url: URL(string: url)!)
         request.httpMethod = "POST"
@@ -81,38 +151,10 @@ struct ContentView: View {
         request.httpBody = formData
         
         let session = URLSession.shared
-        let task = session.uploadTask(with: request, from: formData, completionHandler: { data, response, error -> Void in
-            if (error != nil) {
-                return
-            }
-//            print("response: \(String(data: data!, encoding: .utf8)!)")
-            do {
-                let json = try JSONSerialization.jsonObject(with: data!, options: .fragmentsAllowed)
-                print(json)
-            } catch {
-                print("Parse failed.")
-            }
-        })
-        task.resume()
-    }
-    
-    // will call after PHPhotoLibrary.requestAuthorization
-    private func showUI() {
-        let result = PHAsset.fetchAssets(with: nil)
-        let manager = PHImageManager.default()
-        let options = PHImageRequestOptions()
-        
-        options.version = .current
-        options.deliveryMode = .highQualityFormat
-        options.resizeMode = .none
-        result.enumerateObjects({ (asset, _, _) in
-            // fetch original image binary
-            manager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options, resultHandler: { (image, _) in
-                if (image == nil) { return }
-                let imageAsset = LocalImageAsset(localIdentifier: asset.localIdentifier, image: image!)
-                imageAssets.append(imageAsset)
-            })
-        })
+        let (data, _) = try await session.upload(for: request, from: formData)
+        let json = try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) as! Dictionary<String, String>
+        print(json)
+        return json["image_id"]! // can be permalink_url(gyazo.com), url(i.gyazo.com)
     }
 }
 
@@ -129,10 +171,8 @@ private func getAccessToken() -> String {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            let sampleAssets = Array(repeating: LocalImageAsset(
-                localIdentifier: UUID().uuidString, image:
-                UIImage(imageLiteralResourceName: "tani")), count: 20)
-            ContentView(imageAssets: sampleAssets ).environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+            let dummyAssets: [PHAsset] = Array(repeating: PHAsset(), count: 20)
+            ContentView(appPhase: .uploadReady, assets: dummyAssets).environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
         }
     }
 }
