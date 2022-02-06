@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		197C677627AF6CD000A907E0 /* IdStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197C677527AF6CD000A907E0 /* IdStore.swift */; };
 		19F92AB6279718BC00F28DEB /* gyazo_uploaderApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F92AB5279718BC00F28DEB /* gyazo_uploaderApp.swift */; };
 		19F92AB8279718BC00F28DEB /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19F92AB7279718BC00F28DEB /* ContentView.swift */; };
 		19F92ABA279718BE00F28DEB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 19F92AB9279718BE00F28DEB /* Assets.xcassets */; };
@@ -37,6 +38,7 @@
 
 /* Begin PBXFileReference section */
 		190F9EC3279A2129001DF71C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		197C677527AF6CD000A907E0 /* IdStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdStore.swift; sourceTree = "<group>"; };
 		19F92AB2279718BC00F28DEB /* gyazo-uploader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "gyazo-uploader.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		19F92AB5279718BC00F28DEB /* gyazo_uploaderApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = gyazo_uploaderApp.swift; sourceTree = "<group>"; };
 		19F92AB7279718BC00F28DEB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -102,6 +104,7 @@
 				190F9EC3279A2129001DF71C /* Info.plist */,
 				19F92AB5279718BC00F28DEB /* gyazo_uploaderApp.swift */,
 				19F92AB7279718BC00F28DEB /* ContentView.swift */,
+				197C677527AF6CD000A907E0 /* IdStore.swift */,
 				19F92AB9279718BE00F28DEB /* Assets.xcassets */,
 				19F92ABE279718BE00F28DEB /* Persistence.swift */,
 				19F92AC0279718BE00F28DEB /* gyazo_uploader.xcdatamodeld */,
@@ -269,6 +272,7 @@
 				19F92ABF279718BE00F28DEB /* Persistence.swift in Sources */,
 				19F92AB8279718BC00F28DEB /* ContentView.swift in Sources */,
 				19F92AB6279718BC00F28DEB /* gyazo_uploaderApp.swift in Sources */,
+				197C677627AF6CD000A907E0 /* IdStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

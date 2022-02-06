@@ -47,10 +47,11 @@ struct ContentView: View {
     @State var assets: [PHAsset] = []
     @State var uploadPhotoNum = 0
     @State var uploadingImage: UIImage? = nil
+    @StateObject private var idStore = IdStore() // subscribe IdStore
     
     var body: some View {
         VStack {
-            Text(statusMessage).padding()
+            Text(statusMessage)
             if (appPhase == .uploadReady) {
                 Button("Upload!") {
                     appPhase = .uploading
@@ -59,12 +60,15 @@ struct ContentView: View {
                         appPhase = .complete
                     }
                 }
+                .padding()
             }
+            Text("Total upload: \(idStore.identifiers.count)")
             if uploadingImage != nil {
                 Image(uiImage: uploadingImage!)
                     .resizable(resizingMode: .stretch)
                     .aspectRatio(contentMode: .fit)
                     .frame(height: 128)
+                    .padding()
             }
         }.onAppear(perform: viewDidLoad)
     }
@@ -72,13 +76,31 @@ struct ContentView: View {
     
     private func viewDidLoad() {
         if (appPhase != .initialized) {return} // for Preview
+        
+        var idStoreLoaded = false
+        
+        // Load identifiers of uploaded photos from file
+        IdStore.load(completion: { result in
+            switch result {
+            case .failure(let error):
+                fatalError(error.localizedDescription)
+            case .success(let identifiers):
+                idStore.identifiers = identifiers
+                idStoreLoaded = true
+                if (appPhase == .uploadReady) {
+                    onUploadReady()
+                }
+            }
+        })
 
         // Request permission to access photo library
         PHPhotoLibrary.requestAuthorization(for: .readWrite) { [self] (status) in
             DispatchQueue.main.async { [self] in
                 if(status == .authorized) {
-                    onAuthorized()
                     appPhase = .uploadReady
+                    if (idStoreLoaded) {
+                        onUploadReady()
+                    }
                 } else {
                     appPhase = .denied
                 }
@@ -87,13 +109,14 @@ struct ContentView: View {
     }
     
     // will call after PHPhotoLibrary.requestAuthorization
-    private func onAuthorized() {
+    // and loaded idStore
+    private func onUploadReady() {
         let result = PHAsset.fetchAssets(with: .image, options: nil)
         
         let jikkenLimit = 10 // no spam in experiment
         let count = min(jikkenLimit, result.count)
         
-        assets = result.objects(at: IndexSet(0..<count))
+        assets = result.objects(at: IndexSet(0..<count)).filter { !idStore.identifiers.contains($0.localIdentifier) }
     }
     
     private func uploadAllPhotos() async {
@@ -103,7 +126,10 @@ struct ContentView: View {
             let image = await requestImageAsync(asset: asset) // get photo from storage or icloud
             uploadingImage = image // show uploading image
             do {
+                // upload to Gyazo
                 _ = try await uploadImage(image: image)
+                // mark as uploaded
+                _ = await idStore.append(identifier: asset.localIdentifier)
                 uploadPhotoNum += 1
             } catch {
                 print(error)
@@ -181,6 +207,10 @@ struct ContentView_Previews: PreviewProvider {
         Group {
             let dummyAssets: [PHAsset] = Array(repeating: PHAsset(), count: 20)
             let dummyImage = UIImage(imageLiteralResourceName: "tani")
+            // Ready to upload
+            ContentView(appPhase: .uploadReady, assets: dummyAssets)
+                .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+            // Uploading
             ContentView(appPhase: .uploading, assets: dummyAssets, uploadingImage: dummyImage)
                 .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
         }
