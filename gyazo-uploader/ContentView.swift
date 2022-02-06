@@ -65,6 +65,12 @@ struct ContentView: View {
                     .frame(height: 128)
                     .padding()
             }
+            if (appPhase == .complete) {
+                Button("Next") {
+                    appPhase = .initialized
+                    viewDidLoad()
+                }
+            }
         }.onAppear(perform: viewDidLoad)
     }
     
