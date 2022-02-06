@@ -9,11 +9,6 @@ import SwiftUI
 import CoreData
 import PhotosUI
 
-struct LocalImageAsset {
-    var localIdentifier: String
-    var image: UIImage
-}
-
 enum AppPhase {
     case initialized // request authorization for photo library
     case denied // access denied
@@ -81,14 +76,16 @@ struct ContentView: View {
         
         // Load identifiers of uploaded photos from file
         IdStore.load(completion: { result in
-            switch result {
-            case .failure(let error):
-                fatalError(error.localizedDescription)
-            case .success(let identifiers):
-                idStore.identifiers = identifiers
-                idStoreLoaded = true
-                if (appPhase == .uploadReady) {
-                    onUploadReady()
+            DispatchQueue.main.async {
+                switch result {
+                case .failure(let error):
+                    fatalError(error.localizedDescription)
+                case .success(let identifiers):
+                    idStore.identifiers = identifiers
+                    idStoreLoaded = true
+                    if (appPhase == .uploadReady) {
+                        onUploadReady()
+                    }
                 }
             }
         })
@@ -113,7 +110,7 @@ struct ContentView: View {
     private func onUploadReady() {
         let result = PHAsset.fetchAssets(with: .image, options: nil)
         
-        let jikkenLimit = 10 // no spam in experiment
+        let jikkenLimit = 5 // no spam in experiment
         let count = min(jikkenLimit, result.count)
         
         assets = result.objects(at: IndexSet(0..<count)).filter { !idStore.identifiers.contains($0.localIdentifier) }
@@ -122,12 +119,9 @@ struct ContentView: View {
     private func uploadAllPhotos() async {
         uploadPhotoNum = 0
         for asset in assets {
-            // asset.localIdentifier
-            let image = await requestImageAsync(asset: asset) // get photo from storage or icloud
-            uploadingImage = image // show uploading image
             do {
                 // upload to Gyazo
-                _ = try await uploadImage(image: image)
+                _ = try await uploadImageAsset(asset: asset) // get photo from storage or icloud and upload
                 // mark as uploaded
                 _ = await idStore.append(identifier: asset.localIdentifier)
                 uploadPhotoNum += 1
@@ -144,18 +138,21 @@ struct ContentView: View {
         options.version = .current
         options.deliveryMode = .highQualityFormat
         options.resizeMode = .none
+        options.isNetworkAccessAllowed = true // download asset metadata from iCloud if needed
         
-        return await withCheckedContinuation({
-            (continuation: CheckedContinuation<UIImage, Never>) in
-                // which is better requestImage or requestImageDataAndOrientation?
-                manager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options, resultHandler: { (image, _) in
-                        // TODO: support image is nil
-                        continuation.resume(returning: image!)
+        return await withCheckedContinuation({ (continuation: CheckedContinuation<UIImage, Never>) in
+            // which is better requestImage or requestImageDataAndOrientation?
+            manager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options, resultHandler: { (image, _) in
+                    // TODO: support image is nil
+                    continuation.resume(returning: image!)
             })
         })
     }
     
-    private func uploadImage(image: UIImage) async throws -> String {
+    private func uploadImageAsset(asset: PHAsset) async throws -> String {
+        let image = await requestImageAsync(asset: asset)
+        uploadingImage = image // show uploading image
+        
         let url = "https://upload.gyazo.com/api/upload"
         var request = URLRequest(url: URL(string: url)!)
         request.httpMethod = "POST"
@@ -173,9 +170,32 @@ struct ContentView: View {
         
         formData.append("--\(boundary)\r\n".data(using: .utf8)!)
 
-        formData.append("Content-Disposition: form-data; name=\"imagedata\";  filename=\"gyazo_agetarou_sample.png\"\r\n".data(using: .utf8)!)
-        formData.append("Content-Type: image/png\r\n\r\n".data(using: .utf8)!)
-        let imageData = image.pngData()
+        formData.append("Content-Disposition: form-data; name=\"app\"\r\n\r\n".data(using: .utf8)!)
+        formData.append("gyazo-uploader iOS\r\n".data(using: .utf8)!)
+        
+        formData.append("--\(boundary)\r\n".data(using: .utf8)!)
+
+        formData.append("Content-Disposition: form-data; name=\"desc\"\r\n\r\n".data(using: .utf8)!)
+        if let location = asset.location {
+            let longitude = String(location.coordinate.longitude)
+            let latitude = String(location.coordinate.latitude)
+            formData.append("location: \(latitude) \(longitude)\r\n".data(using: .utf8)!)
+            print("location: \(latitude) \(longitude)")
+        }
+        
+        formData.append("--\(boundary)\r\n".data(using: .utf8)!)
+        
+        if let created = asset.creationDate {
+            formData.append("Content-Disposition: form-data; name=\"created_at\"\r\n\r\n".data(using: .utf8)!)
+            let unixtime = created.timeIntervalSince1970
+            formData.append("\(unixtime)\r\n".data(using: .utf8)!)
+            
+            formData.append("--\(boundary)\r\n".data(using: .utf8)!)
+        }
+
+        formData.append("Content-Disposition: form-data; name=\"imagedata\";  filename=\"gyazo_agetarou_sample.jpg\"\r\n".data(using: .utf8)!)
+        formData.append("Content-Type: image/jpg\r\n\r\n".data(using: .utf8)!)
+        let imageData = image.jpegData(compressionQuality: 1)
         formData.append(imageData!)
         formData.append("\r\n".data(using: .utf8)!)
 

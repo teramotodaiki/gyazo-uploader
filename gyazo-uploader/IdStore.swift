@@ -22,6 +22,7 @@ class IdStore: ObservableObject {
             do {
                 // read file
                 let fileURL = try fileURL()
+                print(fileURL.absoluteString)
                 guard let file = try? FileHandle(forReadingFrom: fileURL) else {
                     // file not exists
                     DispatchQueue.main.async {
@@ -36,7 +37,7 @@ class IdStore: ObservableObject {
                     }
                     return
                 }
-                let identifiers = csv.components(separatedBy: "\n")
+                let identifiers = csv.components(separatedBy: "\n").filter { !$0.isEmpty }
                 completion(.success(identifiers))
             } catch {
                 DispatchQueue.main.async {
