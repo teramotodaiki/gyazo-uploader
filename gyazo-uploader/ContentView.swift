@@ -76,16 +76,14 @@ struct ContentView: View {
         
         // Load identifiers of uploaded photos from file
         IdStore.load(completion: { result in
-            DispatchQueue.main.async {
-                switch result {
-                case .failure(let error):
-                    fatalError(error.localizedDescription)
-                case .success(let identifiers):
-                    idStore.identifiers = identifiers
-                    idStoreLoaded = true
-                    if (appPhase == .uploadReady) {
-                        onUploadReady()
-                    }
+            switch result {
+            case .failure(let error):
+                fatalError(error.localizedDescription)
+            case .success(let identifiers):
+                idStore.identifiers = identifiers
+                idStoreLoaded = true
+                if (appPhase == .uploadReady) {
+                    onUploadReady()
                 }
             }
         })

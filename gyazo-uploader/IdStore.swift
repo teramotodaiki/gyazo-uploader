@@ -38,7 +38,9 @@ class IdStore: ObservableObject {
                     return
                 }
                 let identifiers = csv.components(separatedBy: "\n").filter { !$0.isEmpty }
-                completion(.success(identifiers))
+                DispatchQueue.main.async {
+                    completion(.success(identifiers))
+                }
             } catch {
                 DispatchQueue.main.async {
                     completion(.failure(error))
