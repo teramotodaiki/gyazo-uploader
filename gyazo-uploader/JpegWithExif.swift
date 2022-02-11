@@ -16,35 +16,15 @@ enum ExifError: Error {
     case CGImageDestinationCreateWithDataReturnsNil
 }
 
-func toJpegWithExif(image: UIImage, metadata: NSDictionary, location: CLLocation?) -> Data {
+func toJpegWithExif(image: CIImage) -> Data {
     return autoreleasepool(invoking: { () -> Data in
         let data = NSMutableData()
-        let options = metadata.mutableCopy() as! NSMutableDictionary
-        options[kCGImageDestinationLossyCompressionQuality] = CGFloat(1) // compressionQuality?
-        
-        // Convert CLLocation into NSMutableDictionary
-        if let location = location {
-            let gpsData = NSMutableDictionary()
-            let altitudeRef = Int(location.altitude < 0.0 ? 1 : 0)
-            let latitudeRef = location.coordinate.latitude < 0.0 ? "S" : "N"
-            let longitudeRef = location.coordinate.longitude < 0.0 ? "W" : "E"
-            
-            // GPS metadata
-            gpsData[kCGImagePropertyGPSLatitude] = abs(location.coordinate.latitude)
-            gpsData[kCGImagePropertyGPSLatitudeRef] = latitudeRef
-            gpsData[kCGImagePropertyGPSLongitude] = abs(location.coordinate.longitude)
-            gpsData[kCGImagePropertyGPSLongitudeRef] = longitudeRef
-            gpsData[kCGImagePropertyGPSAltitude] = Int(abs(location.altitude))
-            gpsData[kCGImagePropertyGPSAltitudeRef] = altitudeRef
-            gpsData[kCGImagePropertyGPSDateStamp] = location.timestamp.isoDate()
-            gpsData[kCGImagePropertyGPSTimeStamp] = location.timestamp.isoTime()
-            gpsData[kCGImagePropertyGPSVersion] = "2.2.0.0"
-            
-            options[kCGImagePropertyGPSDictionary] = gpsData
-        }
+        let options = NSDictionary(dictionary: image.properties, copyItems: true)
         
         let imageDestinationRef = CGImageDestinationCreateWithData(data as CFMutableData, kUTTypeJPEG, 1, nil)!
-        CGImageDestinationAddImage(imageDestinationRef, image.cgImage!, options)
+        let context = CIContext()
+        let cgImage = context.createCGImage(image, from: image.extent)!
+        CGImageDestinationAddImage(imageDestinationRef, cgImage, options)
         CGImageDestinationFinalize(imageDestinationRef)
         return data as Data
     })

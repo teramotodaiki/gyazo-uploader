@@ -137,26 +137,24 @@ struct ContentView: View {
         }
     }
     
-    private func requestImageAsync(asset: PHAsset) async -> UIImage {
-        let manager = PHImageManager.default()
-        let options = PHImageRequestOptions()
-        options.version = .current
-        options.deliveryMode = .highQualityFormat
-        options.resizeMode = .none
+    private func requestImageAsync(asset: PHAsset) async -> CIImage {
+        let options = PHContentEditingInputRequestOptions()
         options.isNetworkAccessAllowed = true // download asset metadata from iCloud if needed
         
-        return await withCheckedContinuation({ (continuation: CheckedContinuation<UIImage, Never>) in
-            // which is better requestImage or requestImageDataAndOrientation?
-            manager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options, resultHandler: { (image, _)  in
-                    // TODO: support image is nil
-                    continuation.resume(returning: image!)
+        return await withCheckedContinuation({ (continuation: CheckedContinuation<CIImage, Never>) in
+            asset.requestContentEditingInput(with: options, completionHandler: { (input, _) in
+                let url = input?.fullSizeImageURL!
+                let ciImage = CIImage(contentsOf: url!)
+                // TODO: support image is nil
+                continuation.resume(returning: ciImage!)
             })
         })
     }
     
     private func uploadImageAsset(asset: PHAsset) async throws -> String {
-        let image = await requestImageAsync(asset: asset)
-        uploadingImage = image // show uploading image
+        let ciImage = await requestImageAsync(asset: asset)
+        let imageData = toJpegWithExif(image: ciImage)
+        uploadingImage = UIImage(data: imageData) // show uploading image
         
         let url = "https://upload.gyazo.com/api/upload"
         var request = URLRequest(url: URL(string: url)!)
@@ -190,7 +188,6 @@ struct ContentView: View {
 
         formData.append("Content-Disposition: form-data; name=\"imagedata\";  filename=\"gyazo_agetarou_sample.jpg\"\r\n".data(using: .utf8)!)
         formData.append("Content-Type: image/jpg\r\n\r\n".data(using: .utf8)!)
-        let imageData = toJpegWithExif(image: image, metadata: NSDictionary(), location: asset.location)
         formData.append(imageData)
         formData.append("\r\n".data(using: .utf8)!)
 
