@@ -7,6 +7,11 @@
 
 import Foundation
 
+enum IdStoreError: Error {
+    case FileIsNotUTF8
+}
+
+
 // localIdentifiers of uploaded assets
 class IdStore: ObservableObject {
     @Published var identifiers: [String] = []
@@ -17,36 +22,39 @@ class IdStore: ObservableObject {
             .appendingPathComponent("identifiers.csv") // file name
     }
     
-    static func load(completion: @escaping (Result<[String], Error>) -> Void) {
-        DispatchQueue.global(qos: .background).async {
-            do {
-                // read file
-                let fileURL = try fileURL()
-                print(fileURL.absoluteString)
-                guard let file = try? FileHandle(forReadingFrom: fileURL) else {
-                    // file not exists
-                    DispatchQueue.main.async {
-                        completion(.success([]))
+    static func load() async throws -> [String] {
+        return try await withCheckedThrowingContinuation({ (continuation: CheckedContinuation<[String], Error>) in
+            // load from file
+            DispatchQueue.global(qos: .background).async {
+                do {
+                    // read file
+                    let fileURL = try fileURL()
+                    print(fileURL.absoluteString)
+                    guard let file = try? FileHandle(forReadingFrom: fileURL) else {
+                        // file not exists
+                        DispatchQueue.main.async {
+                            continuation.resume(returning: [])
+                        }
+                        return
                     }
-                    return
-                }
-                guard let csv = String(data: file.availableData, encoding: .utf8) else {
-                    // invalid file
-                    DispatchQueue.main.async {
-                        completion(.success([]))
+                    guard let csv = String(data: file.availableData, encoding: .utf8) else {
+                        // invalid file
+                        DispatchQueue.main.async {
+                            continuation.resume(throwing: IdStoreError.FileIsNotUTF8)
+                        }
+                        return
                     }
-                    return
-                }
-                let identifiers = csv.components(separatedBy: "\n").filter { !$0.isEmpty }
-                DispatchQueue.main.async {
-                    completion(.success(identifiers))
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(.failure(error))
+                    let identifiers = csv.components(separatedBy: "\n").filter { !$0.isEmpty }
+                    DispatchQueue.main.async {
+                        continuation.resume(returning: identifiers)
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
-        }
+        })
     }
     
     static func save(identifiers: [String], completion: @escaping (Result<Int, Error>) -> Void) {

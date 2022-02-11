@@ -12,6 +12,7 @@ import PhotosUI
 enum AppPhase {
     case initialized // request authorization for photo library
     case denied // access denied
+    case authorized // authorized
     case uploadReady // fetched assets from photo library
     case uploading // uploading images to gyazo
     case complete // upload completed
@@ -31,6 +32,8 @@ struct ContentView: View {
             return "Requesting to access your photos..."
         case .denied:
             return "Please allow to access your photos"
+        case .authorized:
+            return "Find new photos..."
         case .uploadReady:
             return "\(assets.count) photos will upload"
         case .uploading:
@@ -65,10 +68,12 @@ struct ContentView: View {
                     .frame(height: 128)
                     .padding()
             }
-            if (appPhase == .complete) {
-                Button("Next") {
-                    appPhase = .initialized
-                    viewDidLoad()
+            if (appPhase == .complete || appPhase == .uploadReady) {
+                Button("Reload") {
+                    appPhase = .authorized
+                    Task {
+                        await checkForUpload()
+                    }
                 }
             }
         }.onAppear(perform: viewDidLoad)
@@ -76,31 +81,15 @@ struct ContentView: View {
     
     
     private func viewDidLoad() {
-        if (appPhase != .initialized) {return} // for Preview
+        if (appPhase != .initialized) {return}
         
-        var idStoreLoaded = false
-        
-        // Load identifiers of uploaded photos from file
-        IdStore.load(completion: { result in
-            switch result {
-            case .failure(let error):
-                fatalError(error.localizedDescription)
-            case .success(let identifiers):
-                idStore.identifiers = identifiers
-                idStoreLoaded = true
-                if (appPhase == .uploadReady) {
-                    onUploadReady()
-                }
-            }
-        })
-
         // Request permission to access photo library
         PHPhotoLibrary.requestAuthorization(for: .readWrite) { [self] (status) in
             DispatchQueue.main.async { [self] in
                 if(status == .authorized) {
-                    appPhase = .uploadReady
-                    if (idStoreLoaded) {
-                        onUploadReady()
+                    appPhase = .authorized
+                    Task {
+                        await checkForUpload()
                     }
                 } else {
                     appPhase = .denied
@@ -110,14 +99,26 @@ struct ContentView: View {
     }
     
     // will call after PHPhotoLibrary.requestAuthorization
-    // and loaded idStore
-    private func onUploadReady() {
-        let result = PHAsset.fetchAssets(with: .image, options: nil)
-        
-        let jikkenLimit = 5 // no spam in experiment
-        let count = min(jikkenLimit, result.count)
-        
-        assets = result.objects(at: IndexSet(0..<count)).filter { !idStore.identifiers.contains($0.localIdentifier) }
+    private func checkForUpload() async {
+        do {
+            // Load identifiers of uploaded photos from file
+            let identifiers = try await IdStore.load()
+            DispatchQueue.main.async {
+                idStore.identifiers = identifiers
+            }
+            
+            let result = PHAsset.fetchAssets(with: .image, options: nil)
+            
+            let jikkenLimit = 5 // no spam in experiment
+            let count = min(jikkenLimit, result.count)
+            
+            assets = result.objects(at: IndexSet(0..<count)).filter { !idStore.identifiers.contains($0.localIdentifier) }
+            
+            appPhase = .uploadReady
+        } catch {
+            print("Failed to check for upload")
+            print(error)
+        }
     }
     
     private func uploadAllPhotos() async {
