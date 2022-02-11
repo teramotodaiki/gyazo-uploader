@@ -109,7 +109,7 @@ struct ContentView: View {
             
             let result = PHAsset.fetchAssets(with: .image, options: nil)
             
-            let jikkenLimit = 5 // no spam in experiment
+            let jikkenLimit = 2 // no spam in experiment
             let count = min(jikkenLimit, result.count)
             
             assets = result.objects(at: IndexSet(0..<count)).filter { !idStore.identifiers.contains($0.localIdentifier) }
@@ -147,7 +147,7 @@ struct ContentView: View {
         
         return await withCheckedContinuation({ (continuation: CheckedContinuation<UIImage, Never>) in
             // which is better requestImage or requestImageDataAndOrientation?
-            manager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options, resultHandler: { (image, _) in
+            manager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options, resultHandler: { (image, _)  in
                     // TODO: support image is nil
                     continuation.resume(returning: image!)
             })
@@ -179,16 +179,6 @@ struct ContentView: View {
         formData.append("gyazo-uploader iOS\r\n".data(using: .utf8)!)
         
         formData.append("--\(boundary)\r\n".data(using: .utf8)!)
-
-        formData.append("Content-Disposition: form-data; name=\"desc\"\r\n\r\n".data(using: .utf8)!)
-        if let location = asset.location {
-            let longitude = String(location.coordinate.longitude)
-            let latitude = String(location.coordinate.latitude)
-            formData.append("location: \(latitude) \(longitude)\r\n".data(using: .utf8)!)
-            print("location: \(latitude) \(longitude)")
-        }
-        
-        formData.append("--\(boundary)\r\n".data(using: .utf8)!)
         
         if let created = asset.creationDate {
             formData.append("Content-Disposition: form-data; name=\"created_at\"\r\n\r\n".data(using: .utf8)!)
@@ -200,8 +190,8 @@ struct ContentView: View {
 
         formData.append("Content-Disposition: form-data; name=\"imagedata\";  filename=\"gyazo_agetarou_sample.jpg\"\r\n".data(using: .utf8)!)
         formData.append("Content-Type: image/jpg\r\n\r\n".data(using: .utf8)!)
-        let imageData = image.jpegData(compressionQuality: 1)
-        formData.append(imageData!)
+        let imageData = toJpegWithExif(image: image, metadata: NSDictionary(), location: asset.location)
+        formData.append(imageData)
         formData.append("\r\n".data(using: .utf8)!)
 
         formData.append("--\(boundary)--\r\n".data(using: .utf8)!)
