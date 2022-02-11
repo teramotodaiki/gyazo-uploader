@@ -150,10 +150,11 @@ struct ContentView: View {
             })
         })
     }
+
     
     private func uploadImageAsset(asset: PHAsset) async throws -> String {
-        let ciImage = await requestImageAsync(asset: asset)
-        let imageData = toJpegWithExif(image: ciImage)
+        let image = await requestImageAsync(asset: asset)
+        let imageData = image.toJpegWithExif()
         uploadingImage = UIImage(data: imageData) // show uploading image
         
         let url = "https://upload.gyazo.com/api/upload"
