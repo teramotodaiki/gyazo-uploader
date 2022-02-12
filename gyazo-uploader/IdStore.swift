@@ -11,10 +11,14 @@ enum IdStoreError: Error {
     case FileIsNotUTF8
 }
 
+// localIdentifier_1,gyazoId_1
+// localIdentifier_2,gyazoId_2
+// ...
 
 // localIdentifiers of uploaded assets
 class IdStore: ObservableObject {
-    @Published var identifiers: [String] = []
+    @Published var identifiers: [String] = [] // Viewから購読されるlocalIdentifierだけの配列
+    private var rows: [String] = [] // CSVデータの実体
     
     private static func fileURL() throws -> URL {
         // save at document dicretory of this user
@@ -22,18 +26,19 @@ class IdStore: ObservableObject {
             .appendingPathComponent("identifiers.csv") // file name
     }
     
-    static func load() async throws -> [String] {
-        return try await withCheckedThrowingContinuation({ (continuation: CheckedContinuation<[String], Error>) in
+    func load() async throws {
+        identifiers = [] // be empty
+        return try await withCheckedThrowingContinuation({ (continuation: CheckedContinuation<Void, Error>) in
             // load from file
             DispatchQueue.global(qos: .background).async {
                 do {
                     // read file
-                    let fileURL = try fileURL()
+                    let fileURL = try IdStore.fileURL()
                     print(fileURL.absoluteString)
                     guard let file = try? FileHandle(forReadingFrom: fileURL) else {
                         // file not exists
                         DispatchQueue.main.async {
-                            continuation.resume(returning: [])
+                            continuation.resume()
                         }
                         return
                     }
@@ -44,9 +49,12 @@ class IdStore: ObservableObject {
                         }
                         return
                     }
-                    let identifiers = csv.components(separatedBy: "\n").filter { !$0.isEmpty }
+                    let rows = csv.components(separatedBy: "\n").filter { !$0.isEmpty }
+                    let identifiers = rows.map { $0.components(separatedBy: ",")[0].trimmingCharacters(in: .whitespacesAndNewlines) }
                     DispatchQueue.main.async {
-                        continuation.resume(returning: identifiers)
+                        self.rows = rows
+                        self.identifiers = identifiers
+                        continuation.resume()
                     }
                 } catch {
                     DispatchQueue.main.async {
@@ -57,14 +65,14 @@ class IdStore: ObservableObject {
         })
     }
     
-    static func save(identifiers: [String], completion: @escaping (Result<Int, Error>) -> Void) {
+    func save(completion: @escaping (Result<Int, Error>) -> Void) {
         DispatchQueue.global(qos: .background).async {
             do {
-                let data = identifiers.joined(separator: "\n").data(using: .utf8)
-                let outfile = try fileURL()
-                try data?.write(to: outfile)
+                let data = self.rows.joined(separator: "\n").data(using: .utf8)
+                let outfile = try IdStore.fileURL()
+                try data!.write(to: outfile)
                 DispatchQueue.main.async {
-                    completion(.success(identifiers.count))
+                    completion(.success(self.rows.count))
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -74,14 +82,16 @@ class IdStore: ObservableObject {
         }
     }
     
-    func append(identifier: String) async -> Int {
-        identifiers.append(identifier)
+    func append(identifier: String, gyazoId: String) async -> Int {
+        self.rows.append("\(identifier),\(gyazoId)")
+        
         return await withCheckedContinuation({
             (continuation: CheckedContinuation<Int, Never>) in
-            IdStore.save(identifiers: identifiers, completion: { result in
+            save(completion: { result in
                 switch (result) {
                 case .success(let count):
                     continuation.resume(returning: count)
+                    self.identifiers.append(identifier)
                 case .failure(let error):
                     fatalError(error.localizedDescription)
                 }

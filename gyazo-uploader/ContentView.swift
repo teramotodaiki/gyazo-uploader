@@ -102,17 +102,14 @@ struct ContentView: View {
     private func checkForUpload() async {
         do {
             // Load identifiers of uploaded photos from file
-            let identifiers = try await IdStore.load()
-            DispatchQueue.main.async {
-                idStore.identifiers = identifiers
-            }
+            try await idStore.load()
             
             let result = PHAsset.fetchAssets(with: .image, options: nil)
             
-            let jikkenLimit = 2 // no spam in experiment
-            let count = min(jikkenLimit, result.count)
+//            let jikkenLimit = 2 // no spam in experiment
+//            let count = min(jikkenLimit, result.count)
             
-            assets = result.objects(at: IndexSet(0..<count)).filter { !idStore.identifiers.contains($0.localIdentifier) }
+            assets = result.objects(at: IndexSet(0..<result.count)).filter { !idStore.identifiers.contains($0.localIdentifier) }
             
             appPhase = .uploadReady
         } catch {
@@ -126,9 +123,9 @@ struct ContentView: View {
         for asset in assets {
             do {
                 // upload to Gyazo
-                _ = try await uploadImageAsset(asset: asset) // get photo from storage or icloud and upload
+                let gyazoId = try await uploadImageAsset(asset: asset) // get photo from storage or icloud and upload
                 // mark as uploaded
-                _ = await idStore.append(identifier: asset.localIdentifier)
+                _ = await idStore.append(identifier: asset.localIdentifier, gyazoId: gyazoId)
                 uploadPhotoNum += 1
             } catch {
                 print(error)
